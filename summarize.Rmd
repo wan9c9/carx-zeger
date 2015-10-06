@@ -1,0 +1,103 @@
+---
+title: "Summary of Simulation"
+---
+
+```{r global_options,include=F}
+library(bibtex)
+knitr::opts_chunk$set(fig.width=8, fig.height=6, fig.path='plots/',
+  										dev='svg',
+                      echo=F, warning=T, message=T)
+```
+
+```{r,echo=F}
+#args <- commandArgs(TRUE)
+source("./simulation_setting.R")
+system(paste("cp ./simulation_setting.R ",ind_result_dir)) #copy setting to dir
+setwd(ind_result_dir)
+
+library(matrixStats)
+truePrmtr <- c(prmtrX,prmtrAR,sigma)
+
+simTable0 <- matrix(nrow=nRep,ncol=length(truePrmtr))
+colnames(simTable0) <- c(paste0("X",1:length(prmtrX)),paste0("AR",1:length(prmtrAR)),"sigma")
+
+simTable1 <- matrix(nrow=nRep,ncol=length(truePrmtr))
+colnames(simTable1) <- colnames(simTable0)
+
+timeUsed <- matrix(nrow=nRep,ncol=2)
+colnames(timeUsed) <- c("wang","zeger")
+censorRate<- numeric(nRep)
+cenStrLen <- numeric(nObs)
+
+for(i in 1:nRep)
+{
+  load(file=sprintf("rep_%05d.RData",i-1))
+  #load(file=paste0(ind_result_dir,sprintf("rep_%05d.RData",i-1)))
+  r <- ret
+  prmtr <- c(r$zeger$prmtrX,r$zeger$prmtrAR,r$zeger$sigma)
+  for(cs in r$zeger$cenStrIdx)
+    cenStrLen[cs$nc] <- cenStrLen[cs$nc] + 1
+  simTable1[i,] <- prmtr
+  simTable0[i,] <- r$wang$prmtrEstd
+  censorRate <- r$wang$censorRate
+  timeUsed[i,1] <- r$twang[3]
+  timeUsed[i,2] <- r$tzeger[3]
+  i <- i+1
+}
+
+bias0 <- colMeans(simTable0) - truePrmtr
+sd0 <- colSds(simTable0)
+mse0 <- bias0^2 + sd0^2
+summary0 <- rbind(t(bias0),t(sd0),t(mse0))
+rownames(summary0) <- c("bias","sd","mse")
+
+bias1 <- colMeans(simTable1) - truePrmtr
+sd1 <- colSds(simTable1)
+mse1 <- bias1^2 + sd1^2
+summary1 <- rbind(t(bias1),t(sd1),t(mse1))
+rownames(summary1) <- c("bias","sd","mse")
+
+
+write.table(simTable0,file="zegerResult.txt")
+write.table(simTable1,file="wangResult.txt")
+write.table(timeUsed,file="timeUsed.txt")
+```
+
+The average censoring rate is 
+```{r}
+mean(censorRate)
+```
+
+The bias, s.d. and mse of our method:
+```{r}
+print(summary0)
+```
+
+Similar statistics by zeger:
+```{r}
+print(summary1)
+```
+
+The MSE ratio (wang/zeger):
+```{r}
+print(mse0/mse1)
+```
+
+Averge time used by both methods:
+```{r}
+timeStat <- rbind(t(colMeans(timeUsed)),t(colSds(timeUsed)))
+rownames(timeStat) <- c("Wang", "Zeger")
+colnames(timeStat) <- c("mean", "sd")
+print(timeStat)
+```
+
+```{r hist-cenStrLen}
+idx <- nObs
+for(i in nObs:1)
+  if(!all(cenStrLen[i:nObs]==0))
+  {
+    idx <-i
+    break
+  }
+plot(cenStrLen[1:idx]/nRep/nObs,xlab="Length of censored string", ylab="Empirical proability")
+```

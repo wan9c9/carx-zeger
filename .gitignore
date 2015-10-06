@@ -1,0 +1,13 @@
+*.[oa]
+*~
+*.swp
+*.eps
+*.Rout
+.directory
+#ignore all files in directory sim_result*
+sim_result*/
+#ignore summary file
+summary*.txt
+#only ignore the TODO file in current directory
+/TODO
+
